@@ -12,7 +12,7 @@ import datetime # manipulating date formats
 # Viz
 import matplotlib.pyplot as plt # basic plotting
 import seaborn as sns # for prettier plots
-from sklearn.metrics import median_absolute_error, mean_squared_error, mean_squared_log_error
+from sklearn.metrics import mean_absolute_error, median_absolute_error, mean_squared_error, mean_squared_log_error
 
 
 # TIME SERIES
@@ -40,8 +40,7 @@ sales.date=sales.date.apply(lambda x:datetime.datetime.strptime(x, '%d.%m.%Y'))
 sales.head(5)
 sales.info()
 
-ts=sales.groupby(["date_block_num"])["item_cnt_day"].sum()
-ts.astype('float')
+sales.set_index("date", inplace=True)
 
 plt.figure(figsize=(16,8))
 plt.title('Total Sales of the company')
@@ -73,8 +72,8 @@ def plot_moving_average(series, window, plot_intervals=False, scale=1.96):
 
     plt.plot(series[window:], label='Actual values')
     plt.legend(loc='best')
-    plt.grid(True)
-
+    plt.grid(False)
+    
 #Smooth by the previous 5 days (by week)
 plot_moving_average(ts, 5)
 
@@ -170,7 +169,7 @@ def difference(dataset, interval=1):
     for i in range(interval, len(dataset)):
         value = dataset[i] - dataset[i - interval]
         diff.append(value)
-    return Series(diff)
+    return diff
 
 # invert differenced forecast
 def inverse_difference(last_ob, value):
@@ -206,8 +205,6 @@ plt.plot()
 
 # we can go back to the original series by using the inverse function
 
-# lets model AR MA and the combination of both ARMA
-
 def tsplot(y, lags=None, figsize=(10, 8), style='bmh',title=''):
     if not isinstance(y, pd.Series):
         y = pd.Series(y)
@@ -231,35 +228,8 @@ def tsplot(y, lags=None, figsize=(10, 8), style='bmh',title=''):
         plt.tight_layout()
     return 
 
-# simulate AR process with alpha = 0.5
-    
-np.random.seed(1)
-n_samples = int(1000)
-a = 0.5
-x = w = np.random.normal(size=n_samples)
-
-for t in range(n_samples):
-    x[t] = a*x[t-1] + w[t]
-    
-limit=12    
-_ = tsplot(x, lags=limit,title="AR(1)process")
-
-
-# Simulate an MA(1) process
-n = int(1000)
-
-# set the AR(p) alphas equal to 0
-
-alphas = np.array([0.])
-betas = np.array([0.8])
-
-# add zero-lag and negate alphas
-
-ar = np.r_[1, -alphas]
-ma = np.r_[1, betas]
-ma1 = smt.arma_generate_sample(ar=ar, ma=ma, nsample=n) 
-limit=12
-_ = tsplot(ma1, lags=limit,title="MA(1) process")
+data_diff = data.T3 - data.T3.shift(1)
+tsplot(data_diff[1:], lags=30)
 
 
 
