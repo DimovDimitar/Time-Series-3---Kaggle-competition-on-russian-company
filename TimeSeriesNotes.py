@@ -11,8 +11,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 plt.style.use('fivethirtyeight') 
-# Above is a special style template for matplotlib, highly useful for visualizing time series data
-%matplotlib inline
 from pylab import rcParams
 import statsmodels.api as sm
 import statsmodels.tsa.api as smt
@@ -25,14 +23,24 @@ from statsmodels.tsa.arima_process import ArmaProcess
 from statsmodels.tsa.arima_model import ARIMA
 import math
 from sklearn.metrics import mean_squared_error
+rcParams['figure.figsize'] = 11, 9
+
 print(os.listdir("../input"))
 
 cd "C:\Users\dimit\Documents\GitHub\Time-Series-2---Predicting-air-quality-"
-data = pd.read_csv("energydata_complete.csv", index_col="date", parse_dates=['date'])
+data = pd.read_csv("energydata_complete.csv",
+                   index_col="date", parse_dates=['date'])
+
+df = pd.read_csv("AirQualityUCI.csv", parse_dates=[['Date', 'Time']])
+
+df.isnull().values.any()
+data.isna().values.any()
+
+data['T'] = data['T'].str.replace(",", ".").astype(float)
 
 # if it needs cleaning
 #pressure = pressure.iloc[1:]
-#pressure = pressure.fillna(method='ffill')
+pressure = pressure.fillna(method='ffill')
 
 # initial plot
 data["T3"].asfreq('W').plot()
@@ -40,13 +48,17 @@ data["T3"].asfreq('W').plot()
 # if you need to slice the times
 dr2 = pd.date_range(start='1/1/18', end='1/1/19', freq='M')
 
+# if it needs resampling
 data = data.resample('3H').mean()
 
-rcParams['figure.figsize'] = 11, 9
-
 decomposed = sm.tsa.seasonal_decompose(data['T3'],freq=1)
+
 figure = decomposed.plot()
 plt.show()
+
+from datetime import datetime
+data["Datestamp"] = pd.to_datetime(data['Datestamp'], 
+                                   format='%d/%m/%Y %H.%M.%S')
 
 def plot_moving_average(series, window, plot_intervals=False, scale=1.96):
 
@@ -278,6 +290,57 @@ print("The root mean squared error is {}.".format(rmse))
 
 # The root mean squared error is 0.36455704283985324.
 
+#------------------------------------------------------#
+#--------------- Performing VAR on multiple variables --#
+#------------------------------------------------------#
+
+#creating the train and validation set
+transformed = df.copy()
+transformed['temperature'] = np.log(df.iloc[:, 0]).diff(1)
+transformed['wind_speed'] = np.log(df.iloc[:, 1]).diff(1)
+
+train = data[:int(0.8*(len(data)))]
+valid = data[int(0.8*(len(data))):]
+
+#fit the model
+from statsmodels.tsa.vector_ar.var_model import VAR
+
+model = VARMAX(train, order(5, 0), trend='c')
+model_fit = model.fit(maxiter=1000, disp= False)
+model_fit.summary()
+model_fit.plot_diagnostics()
+plt.show()
+
+for i in range(5):
+    i += 1
+    model = sm.tsa.VARMAX(y_train, order=(i,0))
+    model_result = model.fit(maxiter=1000, disp=False)
+    print('Order = ', i)
+    print('AIC: ', model_result.aic)
+    print('BIC: ', model_result.bic)
+    print('HQIC: ', model_result.hqic)
+
+# make prediction on validation
+prediction = model_fit.forecast(steps=len(valid))
+
+model_results_df = pd.concat(data["T"], forecast], axis=1)
+rmse = sqrt(mean_squared_error(df['temperature'][-7:], forecast))
+
+#converting predictions to dataframe
+pred = pd.DataFrame(index=range(0,len(prediction)),columns=[cols])
+for j in range(0,13):
+    for i in range(0, len(prediction)):
+       pred.iloc[i][j] = prediction[i][j]
+
+#check rmse
+for i in cols:
+    print('rmse value for', i, 'is : ', sqrt(mean_squared_error(pred[i], valid[i])))
+
+#make final predictions
+model = VAR(endog=data)
+model_fit = model.fit()
+yhat = model_fit.forecast(model_fit.y, steps=1)
+print(yhat)
 
 
 
